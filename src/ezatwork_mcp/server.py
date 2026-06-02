@@ -1,9 +1,12 @@
-"""EZ@Work MCP Server — Streamable HTTP transport.
+"""EZ@Work MCP Server — Streamable HTTP with optional GoogleProvider OAuth.
 
-Tested with: fastmcp>=2.0.0
-Transport:   streamable-http (not stdio, not legacy SSE)
-Auth:        Bearer token per-request via Authorization header
-             fastmcp.server.dependencies.get_http_headers()
+Transport: streamable-http  (/mcp endpoint)
+Auth:
+  - If GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + MCP_BASE_URL are set:
+      FastMCP GoogleProvider OAuth proxy (for Claude Desktop / Claude.ai)
+  - Otherwise:
+      No server-level auth; tools authenticate via Bearer ezw_pat_... header
+      (for Claude Code, Cursor, MCP Inspector — all support custom headers)
 """
 import os
 from dotenv import load_dotenv
@@ -12,13 +15,39 @@ from .tools import clients, projects, time_entries, invoices
 
 load_dotenv()
 
+
+def _build_auth():
+    client_id = os.getenv("GOOGLE_CLIENT_ID")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+    base_url = os.getenv("MCP_BASE_URL")
+
+    if not (client_id and client_secret and base_url):
+        return None
+
+    from fastmcp.server.auth.providers.google import GoogleProvider
+
+    return GoogleProvider(
+        client_id=client_id,
+        client_secret=client_secret,
+        base_url=base_url,
+        required_scopes=[
+            "openid",
+            "https://www.googleapis.com/auth/userinfo.email",
+            "https://www.googleapis.com/auth/userinfo.profile",
+        ],
+    )
+
+
+auth = _build_auth()
+
 mcp = FastMCP(
     name="ezatwork",
     instructions=(
         "EZ@Work business assistant. Manages clients, projects, time tracking, "
-        "and invoices. Every request requires a valid API token "
-        "(Authorization: Bearer ezw_pat_...) from https://app.ezatwork.com/settings/api-tokens"
+        "and invoices for freelancers and small businesses. "
+        "Currency, language, and tax rules auto-detect from your EZ@Work profile."
     ),
+    auth=auth,
 )
 
 clients.register(mcp)

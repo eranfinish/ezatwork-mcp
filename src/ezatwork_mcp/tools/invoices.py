@@ -1,6 +1,6 @@
 from datetime import date, timedelta
-from ..ez_client import EzClient
-from ..auth import get_token
+from ..auth import UserNotMappedError
+from ..tool_helpers import get_client_for_request, not_mapped_response
 
 
 def register(mcp):
@@ -25,8 +25,10 @@ def register(mcp):
                    "quantity": float, "unitPrice": float}
             due_in_days: Payment terms in days (default 30)
         """
-        token = get_token()
-        client = EzClient(token)
+        try:
+            client = await get_client_for_request()
+        except UserNotMappedError as e:
+            return not_mapped_response(e)
 
         today = date.today()
         due_date = today + timedelta(days=due_in_days)

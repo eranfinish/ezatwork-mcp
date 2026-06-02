@@ -15,16 +15,19 @@ Cursor, and any MCP-compatible AI.
 
 ## Setup
 
+### Claude Desktop / Claude.ai (OAuth — recommended)
+
+Settings → Connectors → Add custom connector
+- URL: `https://mcp.ezatwork.com/mcp`
+- Authentication: OAuth (automatic)
+
+### Claude Code / Cursor / MCP Inspector (API token)
+
 1. Create a free EZ@Work account at https://app.ezatwork.com
 2. Generate an API token at https://app.ezatwork.com/settings/api-tokens
-3. Add this connector to your AI client (see below)
+3. Connect to `https://mcp.ezatwork.com/mcp` with header `Authorization: Bearer ezw_pat_...`
 
-### Claude Desktop / Claude.ai
-Settings → Connectors → Add custom connector
-- URL: `https://mcp.ezat.work/mcp`
-- Authorization: `Bearer ezw_pat_...`
-
-### MCP Inspector (local testing)
+**Local testing with MCP Inspector:**
 ```bash
 npx @modelcontextprotocol/inspector
 ```
@@ -33,9 +36,9 @@ Connect to `http://localhost:8080/mcp` with header `Authorization: Bearer ezw_pa
 ## Security
 
 - Your data stays in your EZ@Work account
-- API tokens use scoped permissions — grant only what you need
-- All tokens have mandatory expiration
-- Authorization is verified on every request; invalid tokens are rejected immediately
+- OAuth mode: Google identity → EZ@Work account lookup; no credentials stored in the MCP
+- API token mode: scoped permissions — grant only what you need; mandatory expiration
+- Authorization is verified on every request
 
 ## Privacy Policy
 
@@ -76,7 +79,7 @@ pytest tests/
 
 ```bash
 docker build -t ezatwork-mcp .
-docker run -p 8080:8080 -e EZ_API_BASE=https://api.ezat.work ezatwork-mcp
+docker run -p 8080:8080 -e EZ_API_BASE=https://api.ezatwork.com ezatwork-mcp
 ```
 
 ### Deploy to Cloud Run
@@ -88,18 +91,23 @@ gcloud run deploy ezatwork-mcp \
   --project ezatwork-production \
   --allow-unauthenticated \
   --port 8080 \
-  --set-env-vars "EZ_API_BASE=https://api.ezat.work"
+  --update-env-vars "EZ_API_BASE=https://api.ezatwork.com,MCP_BASE_URL=https://mcp.ezatwork.com" \
+  --update-secrets "GOOGLE_CLIENT_ID=ezmcp-google-client-id:latest" \
+  --update-secrets "GOOGLE_CLIENT_SECRET=ezmcp-google-client-secret:latest" \
+  --update-secrets "EZ_MCP_MASTER_TOKEN=ezmcp-master-token:latest"
 ```
 
-> `--allow-unauthenticated` is correct here — auth is enforced at the API token level,
-> not at the Cloud Run level. Every MCP request must carry a valid `Bearer ezw_pat_...` token.
+> `--allow-unauthenticated` is correct — auth is enforced at the MCP layer (OAuth or API token),
+> not at the Cloud Run IAM level.
 
 ### Technical notes
 
 - **Transport:** Streamable HTTP (`/mcp` endpoint)
-- **Library:** `fastmcp>=2.0.0` — `get_http_headers()` from `fastmcp.server.dependencies`
-- **Auth:** Per-request Bearer token extraction via `get_http_headers()`
-- **Backend:** `GET /api/users/me` for locale (currency/language/businessMode)
+- **Library:** `fastmcp 3.3.1`
+- **Auth (OAuth):** `GoogleProvider` from `fastmcp.server.auth.providers.google`
+- **Auth (token):** `get_http_headers()` from `fastmcp.server.dependencies`
+- **Dual-auth:** OAuth active when `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` + `MCP_BASE_URL` are set
+- **Backend:** `GET /api/users/me` for locale; `GET /api/internal/users/by-email` for OAuth→user mapping
 - **Time entries:** `POST /api/timeentry` with `isBillable` field
 - **Invoices:** `POST /api/invoices` with computed `dueDate` and `total` per item
 

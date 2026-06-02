@@ -1,5 +1,5 @@
-from ..ez_client import EzClient
-from ..auth import get_token
+from ..auth import UserNotMappedError
+from ..tool_helpers import get_client_for_request, not_mapped_response
 
 
 def register(mcp):
@@ -24,8 +24,11 @@ def register(mcp):
             description: What was done
             billable: Whether these hours are billable (default true)
         """
-        token = get_token()
-        client = EzClient(token)
+        try:
+            client = await get_client_for_request()
+        except UserNotMappedError as e:
+            return not_mapped_response(e)
+
         result = await client.post(
             "/api/timeentry",
             json={
