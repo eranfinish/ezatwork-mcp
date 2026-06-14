@@ -9,9 +9,14 @@ Auth:
       (for Claude Code, Cursor, MCP Inspector — all support custom headers)
 """
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from starlette.responses import FileResponse, Response
 from .tools import clients, projects, time_entries, invoices
+
+_STATIC_DIR = Path(__file__).parent / "static"
+_FAVICON_PATH = _STATIC_DIR / "favicon.png"
 
 load_dotenv()
 
@@ -54,6 +59,22 @@ clients.register(mcp)
 projects.register(mcp)
 time_entries.register(mcp)
 invoices.register(mcp)
+
+
+# Serve the EZ@Work logo as favicon so Anthropic's Google favicon fetcher
+# and tool-call UI display our brand instead of a generic globe.
+@mcp.custom_route("/favicon.ico", methods=["GET"])
+async def _favicon_ico(request):
+    if _FAVICON_PATH.exists():
+        return FileResponse(_FAVICON_PATH, media_type="image/png")
+    return Response(status_code=404)
+
+
+@mcp.custom_route("/favicon.png", methods=["GET"])
+async def _favicon_png(request):
+    if _FAVICON_PATH.exists():
+        return FileResponse(_FAVICON_PATH, media_type="image/png")
+    return Response(status_code=404)
 
 
 def main():

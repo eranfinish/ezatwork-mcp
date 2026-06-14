@@ -1,0 +1,17 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.eranfinish/ezatwork",
+  "title": "EZ@Work",
+  "description": "Business management for freelancers and small teams — manage clients, projects, time entries, and invoices from Claude through natural conversation. OAuth 2.1 with Google sign-in tied to your EZ@Work account.",
+  "repository": {
+    "url": "https://github.com/eranfinish/ezatwork-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.ezatwork.com/mcp"
+    }
+  ]
+}

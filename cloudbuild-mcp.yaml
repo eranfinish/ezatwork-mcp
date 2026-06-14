@@ -10,8 +10,6 @@ steps:
       - 'build'
       - '-t'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:latest'
-      - '-t'
-      - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPO}/${_SERVICE_NAME}:${_SHORT_SHA}'
       - '.'
 
   - name: 'gcr.io/cloud-builders/docker'
