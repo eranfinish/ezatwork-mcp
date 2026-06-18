@@ -78,13 +78,19 @@ async def _favicon_png(request):
 
 
 def main():
-    port = int(os.getenv("PORT", "8080"))
-    mcp.run(
-        transport="streamable-http",
-        host="0.0.0.0",
-        port=port,
-        path="/mcp",
-    )
+    # Transport selection:
+    #   PORT set       → streamable-http on 0.0.0.0:PORT/mcp (Cloud Run, k8s)
+    #   PORT not set   → stdio (Claude Desktop local install, Glama scan, dev)
+    port = os.getenv("PORT")
+    if port:
+        mcp.run(
+            transport="streamable-http",
+            host="0.0.0.0",
+            port=int(port),
+            path="/mcp",
+        )
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":
