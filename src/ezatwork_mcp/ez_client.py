@@ -6,8 +6,11 @@ Two modes:
 
   - Impersonation mode: used with GoogleProvider OAuth (Claude Desktop / Claude.ai).
     The client authenticates with a master token and impersonates a specific user.
-    Security: the EZ@Work API verifies that X-Impersonate-UserId email matches
-    X-Impersonate-Verified-Email before allowing the request.
+    Security: the Google access token the user signed in with is forwarded in
+    X-Impersonate-Google-Token. The EZ@Work API asks Google whom it belongs to
+    and which OAuth client it was issued to, so a leaked master token alone
+    cannot act as anyone. X-Impersonate-Verified-Email is still sent for API
+    versions that predate the token check.
 """
 import os
 import httpx
@@ -23,6 +26,7 @@ class EzClient:
         api_token: str | None = None,
         impersonate_user_id: int | None = None,
         verified_email: str | None = None,
+        google_token: str | None = None,
     ):
         api_base = os.getenv("EZ_API_BASE", "https://api.ezatwork.com")
         self._base = api_base
@@ -35,7 +39,7 @@ class EzClient:
                 "Content-Type": "application/json",
                 "User-Agent": "ezatwork-mcp/0.2.0",
             }
-        elif impersonate_user_id is not None and verified_email:
+        elif impersonate_user_id is not None and verified_email and google_token:
             master_token = os.getenv("EZ_MCP_MASTER_TOKEN")
             if not master_token:
                 raise RuntimeError("EZ_MCP_MASTER_TOKEN not configured")
@@ -43,12 +47,13 @@ class EzClient:
                 "Authorization": f"Bearer {master_token}",
                 "X-Impersonate-UserId": str(impersonate_user_id),
                 "X-Impersonate-Verified-Email": verified_email,
+                "X-Impersonate-Google-Token": google_token,
                 "Content-Type": "application/json",
                 "User-Agent": "ezatwork-mcp/0.2.0",
             }
         else:
             raise ValueError(
-                "EzClient requires either api_token or both impersonate_user_id+verified_email"
+                "EzClient requires either api_token or impersonate_user_id+verified_email+google_token"
             )
 
     async def get(self, path: str, params: dict | None = None) -> Any:
