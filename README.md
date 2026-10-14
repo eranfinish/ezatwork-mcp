@@ -103,8 +103,10 @@ gcloud run deploy ezatwork-mcp \
 ### Technical notes
 
 - **Transport:** Streamable HTTP (`/mcp` endpoint)
-- **Library:** `fastmcp 3.3.1`
+- **Library:** `fastmcp 3.x` (pinned `<4`)
 - **Auth (OAuth):** `GoogleProvider` from `fastmcp.server.auth.providers.google`
+- **OAuth redirect allowlist:** clients may only register Claude's callbacks and loopback URIs;
+  set `MCP_ALLOWED_REDIRECT_URIS` (comma-separated patterns) to admit other clients
 - **Auth (token):** `get_http_headers()` from `fastmcp.server.dependencies`
 - **Dual-auth:** OAuth active when `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` + `MCP_BASE_URL` are set
 - **Backend:** `GET /api/users/me` for locale; `GET /api/internal/users/by-email` for OAuth→user mapping
