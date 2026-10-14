@@ -20,6 +20,25 @@ _FAVICON_PATH = _STATIC_DIR / "favicon.png"
 
 load_dotenv()
 
+# Redirect URIs an OAuth client may register (DCR) or present (CIMD).
+# Without an allowlist FastMCP accepts any https redirect URI, so anyone could
+# register a client that delivers a victim's authorization code to their own
+# server. Loopback patterns match any port and path (Claude Code / Desktop).
+# Override with a comma-separated MCP_ALLOWED_REDIRECT_URIS to admit more clients.
+DEFAULT_ALLOWED_REDIRECT_URIS = [
+    "https://claude.ai/api/mcp/auth_callback",
+    "https://claude.com/api/mcp/auth_callback",
+    "http://localhost:*",
+    "http://127.0.0.1:*",
+    "http://[::1]:*",
+]
+
+
+def _allowed_redirect_uris() -> list[str]:
+    raw = os.getenv("MCP_ALLOWED_REDIRECT_URIS", "")
+    configured = [uri.strip() for uri in raw.split(",") if uri.strip()]
+    return configured or DEFAULT_ALLOWED_REDIRECT_URIS
+
 
 def _build_auth():
     client_id = os.getenv("GOOGLE_CLIENT_ID")
@@ -40,6 +59,10 @@ def _build_auth():
             "https://www.googleapis.com/auth/userinfo.email",
             "https://www.googleapis.com/auth/userinfo.profile",
         ],
+        allowed_client_redirect_uris=_allowed_redirect_uris(),
+        # Explicit: the consent page is what shows a user which client and
+        # redirect URI they are approving. Never turn it off.
+        require_authorization_consent=True,
     )
 
 
