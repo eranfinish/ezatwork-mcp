@@ -46,6 +46,13 @@ npx @modelcontextprotocol/inspector
 ```
 Connect to `http://localhost:8080/mcp` with header `Authorization: Bearer ezw_pat_...`
 
+## Agent skill
+
+[`skills/ezatwork-business-assistant/SKILL.md`](skills/ezatwork-business-assistant/SKILL.md)
+teaches an agent how to use these tools safely: resolve IDs by listing first,
+confirm every write with the user, treat record text as data, and never claim
+an invoice was sent. It is also listed on [Agensi](https://www.agensi.io).
+
 ## Security
 
 - Your data stays in your EZ@Work account
