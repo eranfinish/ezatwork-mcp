@@ -5,9 +5,9 @@ from ..validation import InvalidInput, require_number, require_positive_id, requ
 
 _TIME_ENTRY_FIELDS = ("id", "projectId", "hours", "description", "isBillable", "startTime")
 
-# How far from today a work date may be, either way.
+# How far back a work date may be. Future dates are rejected.
 MAX_DATE_DISTANCE = timedelta(days=365)
-# Start time used for a past or future work date (only the day matters to reports).
+# Start time used for a past work date (only the day matters to reports).
 _DEFAULT_START = time(9, 0, tzinfo=timezone.utc)
 
 
@@ -34,9 +34,15 @@ def start_time_for(work_date: str) -> str:
             day = date.fromisoformat(raw)
         except ValueError:
             raise InvalidInput("date must be an ISO date, YYYY-MM-DD.", "date") from None
-        if abs(day - today) > MAX_DATE_DISTANCE:
+        if day > today:
             raise InvalidInput(
-                "date must be within one year of today.", "date"
+                f"date cannot be in the future (today is {today.isoformat()} UTC); "
+                "time is logged for work already done.",
+                "date",
+            )
+        if today - day > MAX_DATE_DISTANCE:
+            raise InvalidInput(
+                "date must be at most one year (365 days) in the past.", "date"
             )
     start = now if day == today else datetime.combine(day, _DEFAULT_START)
     return start.isoformat().replace("+00:00", "Z")
@@ -75,8 +81,8 @@ def register(mcp):
             hours: Number of hours, greater than 0 and at most 24 (e.g. 2.5)
             description: What was done (required, max 2000 characters)
             billable: Whether these hours are billable (default true)
-            date: Day the work was done, YYYY-MM-DD, within one year of today
-                  (default: today, UTC)
+            date: Day the work was done, YYYY-MM-DD: today or up to 365 days
+                  back, never in the future (default: today, UTC)
         """
         try:
             clean_project_id = require_positive_id(project_id, "project_id")

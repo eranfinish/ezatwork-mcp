@@ -77,7 +77,6 @@ async def test_log_time_entry_posts_and_trims_result(backend, call, fixed_now):
         ("2026-10-16", "2026-10-16T14:30:05Z"),  # explicit today: now
         ("2026-10-15", "2026-10-15T09:00:00Z"),  # yesterday
         ("2025-10-16", "2025-10-16T09:00:00Z"),  # exactly one year back
-        ("2027-10-16", "2027-10-16T09:00:00Z"),  # exactly one year ahead
     ],
 )
 async def test_log_time_entry_sends_start_time(backend, call, fixed_now, work_date, expected):
@@ -93,7 +92,7 @@ async def test_log_time_entry_sends_start_time(backend, call, fixed_now, work_da
 @pytest.mark.parametrize(
     "work_date",
     ["2026/10/15", "15-10-2026", "2026-10-15T10:00", "20261015", "2026-02-30", "yesterday",
-     "2025-10-15", "2027-10-17"],
+     "2025-10-15", "2026-10-17", "2027-10-16"],
 )
 async def test_log_time_entry_rejects_bad_date(backend, call, fixed_now, work_date):
     result = await call(
@@ -276,3 +275,13 @@ async def test_create_client_posts_clean_payload_and_trims_result(backend, call)
         "id": 12, "name": "Dana Levi", "companyName": "Levi Ltd", "status": "active",
         "email": "dana@example.test", "defaultHourlyRate": 0,
     }
+
+
+async def test_log_time_entry_future_date_message_is_clear(backend, call, fixed_now):
+    result = await call(
+        "log_time_entry", {"project_id": 3, "hours": 1, "description": "x", "date": "2026-10-17"}
+    )
+
+    assert result["error"] == "invalid_input"
+    assert "future" in result["message"]
+    backend.post.assert_not_awaited()
