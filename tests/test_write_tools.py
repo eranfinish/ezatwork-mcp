@@ -103,6 +103,22 @@ async def test_create_invoice_accepts_boundaries_and_trims_result(backend, call)
     assert payload["issueDate"] == payload["dueDate"]
 
 
+async def test_create_invoice_sends_numeric_draft_status(backend, call):
+    backend.post.return_value = {"id": 1}
+
+    await call("create_invoice", {"client_id": 3, "items": [GOOD_ITEM], "due_in_days": 14})
+
+    path = backend.post.await_args.args[0]
+    payload = backend.post.await_args.kwargs["json"]
+    assert path == "/api/invoices"
+    # InvoiceStatus.Draft == 1; the API has no string enum converter.
+    assert payload["status"] == 1
+    assert payload["clientId"] == 3
+    assert payload["items"] == [
+        {"description": "Consulting", "quantity": 2.0, "unitPrice": 100.0, "total": 200.0}
+    ]
+
+
 # --- create_client --------------------------------------------------------
 
 @pytest.mark.parametrize(

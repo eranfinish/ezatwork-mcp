@@ -12,6 +12,12 @@ from ..validation import (
 
 MAX_ITEMS = 50
 
+# The API serialises enums as numbers (Program.cs removed JsonStringEnumConverter),
+# so InvoiceStatus must be sent as its integer value: the string "draft" fails to
+# deserialise and the API answers 400. Backend enum (Entities/Billing/Invoice.cs):
+# Draft = 1, Sent = 2, Paid = 3, Overdue = 4, Cancelled = 5, PartiallyPaid = 6.
+INVOICE_STATUS_DRAFT = 1
+
 _INVOICE_FIELDS = (
     "id",
     "invoiceNumber",
@@ -106,7 +112,7 @@ def register(mcp):
                     "items": normalized_items,
                     "issueDate": today.isoformat(),
                     "dueDate": due_date.isoformat(),
-                    "status": "draft",
+                    "status": INVOICE_STATUS_DRAFT,
                 },
             )
             return {
