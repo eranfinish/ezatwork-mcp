@@ -25,6 +25,9 @@ async def get_client_for_request() -> EzClient:
         return EzClient(
             impersonate_user_id=user["id"],
             verified_email=user["email"],
+            # The upstream Google access token FastMCP verified for this
+            # request; the API re-verifies it with Google before impersonating.
+            google_token=access_token.token,
         )
 
     # API token path
