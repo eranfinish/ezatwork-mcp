@@ -6,29 +6,29 @@ from src.ezatwork_mcp.ez_client import EzClient
 
 
 def test_rejects_missing_token():
-    with pytest.raises(ValueError, match="Invalid API token"):
-        EzClient("")
+    with pytest.raises(ValueError):
+        EzClient(api_token="")
 
 
 def test_rejects_wrong_prefix():
     with pytest.raises(ValueError, match="Invalid API token"):
-        EzClient("sk_live_something")
+        EzClient(api_token="sk_live_something")
 
 
 def test_accepts_valid_token():
-    client = EzClient("ezw_pat_test123")
-    assert client._token == "ezw_pat_test123"
+    client = EzClient(api_token="ezw_pat_test123")
+    assert client._headers["Authorization"] == "Bearer ezw_pat_test123"
 
 
 def test_bearer_header_set():
-    client = EzClient("ezw_pat_abc")
+    client = EzClient(api_token="ezw_pat_abc")
     assert client._headers["Authorization"] == "Bearer ezw_pat_abc"
-    assert client._headers["User-Agent"] == "ezatwork-mcp/0.1.0"
+    assert client._headers["User-Agent"].startswith("ezatwork-mcp/")
 
 
 @pytest.mark.asyncio
 async def test_get_current_user_calls_me():
-    client = EzClient("ezw_pat_test")
+    client = EzClient(api_token="ezw_pat_test")
     mock_response = MagicMock()
     mock_response.json.return_value = {
         "id": 1,

@@ -1,5 +1,51 @@
-from ..auth import UserNotMappedError
-from ..tool_helpers import get_client_for_request, not_mapped_response
+from datetime import date, datetime, time, timedelta, timezone
+
+from ..tool_runtime import UNTRUSTED_DATA_NOTE, pick, run_with_client
+from ..validation import InvalidInput, require_number, require_positive_id, require_text
+
+_TIME_ENTRY_FIELDS = ("id", "projectId", "hours", "description", "isBillable", "startTime")
+
+# How far back a work date may be. Future dates are rejected.
+MAX_DATE_DISTANCE = timedelta(days=365)
+# Start time used for a past work date (only the day matters to reports).
+_DEFAULT_START = time(9, 0, tzinfo=timezone.utc)
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def start_time_for(work_date: str) -> str:
+    """ISO-8601 UTC start time for the entry.
+
+    The API's StartTime is a non-nullable DateTime with no default: an entry
+    posted without it is stored as 0001-01-01 and drops out of every
+    date-range view and report.
+    """
+    now = _utcnow().replace(microsecond=0)
+    today = now.date()
+    raw = (work_date or "").strip()
+    if not raw:
+        day = today
+    else:
+        try:
+            if len(raw) != 10:
+                raise ValueError
+            day = date.fromisoformat(raw)
+        except ValueError:
+            raise InvalidInput("date must be an ISO date, YYYY-MM-DD.", "date") from None
+        if day > today:
+            raise InvalidInput(
+                f"date cannot be in the future (today is {today.isoformat()} UTC); "
+                "time is logged for work already done.",
+                "date",
+            )
+        if today - day > MAX_DATE_DISTANCE:
+            raise InvalidInput(
+                "date must be at most one year (365 days) in the past.", "date"
+            )
+    start = now if day == today else datetime.combine(day, _DEFAULT_START)
+    return start.isoformat().replace("+00:00", "Z")
 
 
 def register(mcp):
@@ -8,6 +54,8 @@ def register(mcp):
             "title": "Log Time Entry",
             "readOnlyHint": False,
             "destructiveHint": False,
+            "idempotentHint": False,
+            "openWorldHint": False,
         }
     )
     async def log_time_entry(
@@ -15,27 +63,52 @@ def register(mcp):
         hours: float,
         description: str,
         billable: bool = True,
+        date: str = "",
     ) -> dict:
-        """Log a time entry (billable hours) to a project/case.
+        """Log a time entry (billable hours) to a project/case. WRITES DATA to
+        the user's EZ@Work account, and billable hours can end up on invoices.
+
+        Before calling, confirm the project, hours, description and billable
+        flag with the user and get their explicit go-ahead. Calling twice logs
+        the hours twice. Use list_projects to find project_id.
+
+        Pass the day the work was done as `date`. If the user says "yesterday"
+        or "last Monday", compute the calendar date (or ask if unsure) and
+        confirm it with them; leaving it empty logs the hours for today.
 
         Args:
-            project_id: The project/case ID
-            hours: Number of hours (e.g. 2.5)
-            description: What was done
+            project_id: The project/case ID (positive integer)
+            hours: Number of hours, greater than 0 and at most 24 (e.g. 2.5)
+            description: What was done (required, max 2000 characters)
             billable: Whether these hours are billable (default true)
+            date: Day the work was done, YYYY-MM-DD: today or up to 365 days
+                  back, never in the future (default: today, UTC)
         """
         try:
-            client = await get_client_for_request()
-        except UserNotMappedError as e:
-            return not_mapped_response(e)
+            clean_project_id = require_positive_id(project_id, "project_id")
+            clean_hours = require_number(
+                hours, "hours", minimum=0, exclusive_minimum=True, maximum=24
+            )
+            clean_description = require_text(description, "description", 2000)
+            start_time = start_time_for(date)
+        except InvalidInput as e:
+            return e.to_response()
 
-        result = await client.post(
-            "/api/timeentry",
-            json={
-                "projectId": project_id,
-                "hours": hours,
-                "description": description,
-                "isBillable": billable,
-            },
-        )
-        return {"success": True, "timeEntry": result}
+        async def action(client):
+            result = await client.post(
+                "/api/timeentry",
+                json={
+                    "projectId": clean_project_id,
+                    "hours": clean_hours,
+                    "description": clean_description,
+                    "isBillable": bool(billable),
+                    "startTime": start_time,
+                },
+            )
+            return {
+                "success": True,
+                "timeEntry": pick(result, _TIME_ENTRY_FIELDS),
+                "note": UNTRUSTED_DATA_NOTE,
+            }
+
+        return await run_with_client(action)
