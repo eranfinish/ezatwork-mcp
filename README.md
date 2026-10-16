@@ -11,7 +11,7 @@ Cursor, and any MCP-compatible AI.
 | `list_clients` | List your clients/customers — id, name, company, status, email (+ default rate). Optional `status`, `search`, `limit` (default 50, max 200) | Read |
 | `list_projects` | List your projects/cases/work orders — id, name, status, client. Optional `status`, `search`, `limit` | Read |
 | `create_client` | Create a client; refuses a likely duplicate (same email, or same name when no email) unless `allow_duplicate=true` | Write |
-| `log_time_entry` | Log billable hours to a project (0 < hours <= 24) | Write |
+| `log_time_entry` | Log billable hours to a project (0 < hours <= 24) for a given `date` (default today) | Write |
 | `create_invoice` | Create a draft invoice, 1-50 line items (auto currency/language/VAT) | Write |
 
 Write tools change data in your EZ@Work account. Their descriptions tell the AI

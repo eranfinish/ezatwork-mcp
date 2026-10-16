@@ -1,9 +1,19 @@
 """Write tools: input validation, duplicate detection, trimmed results."""
+from datetime import datetime, timezone
+
 import pytest
+
+from ezatwork_mcp.tools import time_entries
 
 pytestmark = pytest.mark.asyncio
 
 GOOD_ITEM = {"description": "Consulting", "quantity": 2, "unitPrice": 100}
+FIXED_NOW = datetime(2026, 10, 16, 14, 30, 5, 123456, tzinfo=timezone.utc)
+
+
+@pytest.fixture
+def fixed_now(monkeypatch):
+    monkeypatch.setattr(time_entries, "_utcnow", lambda: FIXED_NOW)
 
 
 # --- log_time_entry -------------------------------------------------------
@@ -29,7 +39,7 @@ async def test_log_time_entry_rejects_invalid_input(backend, call, args, field):
     backend.post.assert_not_awaited()
 
 
-async def test_log_time_entry_posts_and_trims_result(backend, call):
+async def test_log_time_entry_posts_and_trims_result(backend, call, fixed_now):
     backend.post.return_value = {
         "id": 99,
         "projectId": 3,
@@ -46,12 +56,53 @@ async def test_log_time_entry_posts_and_trims_result(backend, call):
 
     backend.post.assert_awaited_once_with(
         "/api/timeentry",
-        json={"projectId": 3, "hours": 24.0, "description": "Wrote the report", "isBillable": True},
+        json={
+            "projectId": 3,
+            "hours": 24.0,
+            "description": "Wrote the report",
+            "isBillable": True,
+            "startTime": "2026-10-16T14:30:05Z",
+        },
     )
     assert result["success"] is True
     assert result["timeEntry"]["id"] == 99
     assert "user" not in result["timeEntry"]
     assert "project" not in result["timeEntry"]
+
+
+@pytest.mark.parametrize(
+    "work_date, expected",
+    [
+        ("", "2026-10-16T14:30:05Z"),            # default: now
+        ("2026-10-16", "2026-10-16T14:30:05Z"),  # explicit today: now
+        ("2026-10-15", "2026-10-15T09:00:00Z"),  # yesterday
+        ("2025-10-16", "2025-10-16T09:00:00Z"),  # exactly one year back
+        ("2027-10-16", "2027-10-16T09:00:00Z"),  # exactly one year ahead
+    ],
+)
+async def test_log_time_entry_sends_start_time(backend, call, fixed_now, work_date, expected):
+    args = {"project_id": 3, "hours": 1, "description": "x"}
+    if work_date:
+        args["date"] = work_date
+
+    await call("log_time_entry", args)
+
+    assert backend.post.await_args.kwargs["json"]["startTime"] == expected
+
+
+@pytest.mark.parametrize(
+    "work_date",
+    ["2026/10/15", "15-10-2026", "2026-10-15T10:00", "20261015", "2026-02-30", "yesterday",
+     "2025-10-15", "2027-10-17"],
+)
+async def test_log_time_entry_rejects_bad_date(backend, call, fixed_now, work_date):
+    result = await call(
+        "log_time_entry", {"project_id": 3, "hours": 1, "description": "x", "date": work_date}
+    )
+
+    assert result["error"] == "invalid_input"
+    assert result["field"] == "date"
+    backend.post.assert_not_awaited()
 
 
 # --- create_invoice -------------------------------------------------------
