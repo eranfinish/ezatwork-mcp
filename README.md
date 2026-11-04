@@ -143,3 +143,7 @@ gcloud run deploy ezatwork-mcp \
 ## Built by
 
 [EZ@Work](https://www.ezatwork.com) — the business OS for independents.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
